@@ -648,6 +648,7 @@ def evaluate(
                         ),
                         "prompt_hash": hash_string(requests[0].arguments[0]),
                         "target_hash": hash_string(str(target)),
+                        "full_prompt_without_answers": task.fewshot_context(doc=doc, num_fewshot=0)
                     }
                     example.update(metrics)
                     acc["logged_samples"].append(example)

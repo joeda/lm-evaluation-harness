@@ -15,6 +15,7 @@ from lm_eval.tasks._factory import TaskFactory
 from lm_eval.tasks._index import Entry, Kind, TaskIndex
 from lm_eval.tasks._yaml_loader import load_yaml
 
+import json
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -326,7 +327,8 @@ class TaskManager:
             if "lm_eval/tasks/" in path_str:
                 return "lm_eval/tasks/" + path_str.split("lm_eval/tasks/")[-1]
             return path_str
-
+        
+        group_lookup = {}
         group_table = MarkdownTableWriter()
         group_table.headers = ["Group", "Config Location"]
         gt_values = []
@@ -334,6 +336,24 @@ class TaskManager:
             entry = self._index[g]
             path = sanitize_path(entry.yaml_path)
             gt_values.append([g, path])
+
+            #print(self.load(g)["group_map"])
+
+            #foo
+            if entry.yaml_path is not None:
+                config = load_yaml(entry.yaml_path, resolve_func=False, recursive=True)
+                group_name = config["group"]
+                
+                for t in config["task"]:
+                    if isinstance(t, str):
+                        group_lookup[t] = group_name
+                    elif isinstance(t, dict) and "task" in t:
+                        for item in t["task"]:
+                            if isinstance(item, str):
+                                group_lookup[item] = group_name
+                            elif isinstance(item, dict) and isinstance(item["task"], str):
+                                group_lookup[item["task"]] = group_name
+
         group_table.value_matrix = gt_values
 
         tag_table = MarkdownTableWriter()
@@ -341,22 +361,39 @@ class TaskManager:
         tag_table.value_matrix = [[t] for t in self.all_tags]
 
         subtask_table = MarkdownTableWriter()
-        subtask_table.headers = ["Task", "Config Location", "Output Type"]
+        subtask_table.headers = ["Task", "Config Location", "Output Type", "Metrics"]
+        dobj = {"tasks": []}
         st_values = []
         for t in self.all_subtasks:
             entry = self._index[t]
             path = entry.yaml_path
             output_type = ""
+            metrics = ""
+            metric_list = []
 
             if path is not None:
                 config = load_yaml(path, resolve_func=False, recursive=True)
                 if "output_type" in config:
                     output_type = config["output_type"]
+                if "metric_list" in config:
+                    metric_list = [item["metric"] for item in config["metric_list"]]
+                    for item in metric_list:
+                        metrics += item + ","
 
             path = sanitize_path(path)
-            st_values.append([t, path, output_type])
+            st_values.append([t, path, output_type, metrics])
+            group_cur = None if t not in group_lookup else group_lookup[t]
+            root_task = path.split("/")[2]
+            dobj["tasks"].append({"task": t,
+                                  "config_location": path,
+                                  "output_type": output_type,
+                                  "metrics": metric_list,
+                                  "group": group_cur,
+                                  "root_task": root_task})
         subtask_table.value_matrix = st_values
 
+        with open('/tmp/lmeval_tasks.json', 'w', encoding='utf-8') as f:
+            json.dump(dobj, f, indent=4)
         result = "\n"
         if list_groups:
             result += group_table.dumps() + "\n\n"

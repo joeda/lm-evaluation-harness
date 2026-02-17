@@ -344,7 +344,7 @@ class TemplateAPI(TemplateLM):
             # bit of a hack. We'll load back before sending to the API
             return JsonChatStr(
                 json.dumps(
-                    [{**item, "type": "text"} for item in chat_history],
+                    [{**item,} for item in chat_history],
                     ensure_ascii=False,
                 )
             )
@@ -462,6 +462,18 @@ class TemplateAPI(TemplateLM):
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
         try:
+            # print("base url: {}\npayload: {}\nheaders: {}\nverify: {}".format(
+            #     self.base_url,
+            #     self._create_payload(
+            #         self.create_message(messages),
+            #         generate=generate,
+            #         gen_kwargs=gen_kwargs,
+            #         seed=self._seed,
+            #         eos=self.eos_string,
+            #         **kwargs,
+            #     ),
+            #     self.header,
+            #     self.verify_certificate))
             response = requests.post(
                 self.base_url,
                 json=self._create_payload(
